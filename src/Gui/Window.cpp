@@ -78,7 +78,9 @@
 #include "Imap/Model/ModelTest/modeltest.h"
 
 Q_DECLARE_METATYPE(QList<QSslCertificate>)
+#if QT_VERSION < 0x050000
 Q_DECLARE_METATYPE(QList<QSslError>)
+#endif
 
 /** @short All user-facing widgets and related classes */
 namespace Gui
@@ -934,7 +936,7 @@ void MainWindow::sslErrors(const QList<QSslCertificate> &certificateChain, const
             s.setValue(Common::SettingsNames::imapSslPemCertificate, buf);
 
 #ifdef XTUPLE_CONNECT
-            QSettings xtSettings(QSettings::UserScope, QString::fromAscii("xTuple.com"), QString::fromAscii("xTuple"));
+            QSettings xtSettings(QSettings::UserScope, QString::fromLatin1("xTuple.com"), QString::fromLatin1("xTuple"));
             xtSettings.setValue(Common::SettingsNames::imapSslPemCertificate, buf);
 #endif
         }
@@ -1396,7 +1398,7 @@ void MainWindow::slotXtSyncCurrentMailbox()
         mailboxes.removeAll(mailbox);
     }
     s.setValue(Common::SettingsNames::xtSyncMailboxList, mailboxes);
-    QSettings(QSettings::UserScope, QString::fromAscii("xTuple.com"), QString::fromAscii("xTuple")).setValue(Common::SettingsNames::xtSyncMailboxList, mailboxes);
+    QSettings(QSettings::UserScope, QString::fromLatin1("xTuple.com"), QString::fromLatin1("xTuple")).setValue(Common::SettingsNames::xtSyncMailboxList, mailboxes);
     prettyMboxModel->xtConnectStatusChanged(index);
 }
 #endif
