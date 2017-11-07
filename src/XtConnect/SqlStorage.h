@@ -78,7 +78,8 @@ private:
     void _fail( const QString &message, const QSqlDatabase &database );
 
     QSqlDatabase db;
-    XSqlQuery _queryValidateMail;
+    XSqlQuery _queryFindMailBody;
+    XSqlQuery _queryInsertMailBody;
     XSqlQuery _queryInsertMail;
     XSqlQuery _queryInsertAddress;
     QSqlQuery _queryMarkMailReady;
