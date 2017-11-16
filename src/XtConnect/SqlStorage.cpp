@@ -72,17 +72,24 @@ void SqlStorage::open()
 
 void SqlStorage::_prepareStatements()
 {
-    _queryValidateMail = XSqlQuery(db);
-    if ( ! _queryValidateMail.prepare( QLatin1String("SELECT eml_id FROM xtbatch.eml "
-                                                     " WHERE :eml_hash=eml_hash::bytea;")) )
-                                                     _fail( "Failed to prepare query _queryValidateMail", _queryValidateMail );
+    _queryFindMailBody = XSqlQuery(db);
+    if ( ! _queryFindMailBody.prepare( QLatin1String("SELECT emlbody_id FROM xtbatch.emlbody "
+                                                     " WHERE :emlbody_hash=emlbody_hash::bytea;")) )
+                                                     _fail( "Failed to prepare query _queryFindMailBody", _queryFindMailBody );
+
+    _queryInsertMailBody = XSqlQuery(db);
+    if ( ! _queryInsertMailBody.prepare( QLatin1String("INSERT INTO xtbatch.emlbody "
+                                                   "(emlbody_hash, emlbody_body, emlbody_msg) "
+                                                   "VALUES "
+                                                   "(:emlbody_hash, :emlbody_body, :emlbody_msg) "
+                                                   "returning emlbody_id;")) )
+                                                    _fail( "Failed to prepare query _queryInsertMailBody", _queryInsertMailBody );
 
     _queryInsertMail = XSqlQuery(db);
     if ( ! _queryInsertMail.prepare( QLatin1String("INSERT INTO xtbatch.eml "
-                                                   "(eml_hash, eml_date, eml_subj, eml_body, eml_msg, eml_status) "
+                                                   "(eml_date, eml_subj, eml_emlbody_id, eml_status) "
                                                    "VALUES "
-                                                   "(:eml_hash, :eml_date, :eml_subj, :eml_body,"
-                                                   " :eml_msg, 'I') "
+                                                   "(:eml_date, :eml_subj, :eml_emlbody_id, 'I') "
                                                    "returning eml_id;")) )
                                                     _fail( "Failed to prepare query _queryInsertMail", _queryInsertMail );
 
@@ -103,20 +110,30 @@ SqlStorage::ResultType SqlStorage::insertMail( const QDateTime &dateTime, const 
     QCryptographicHash hash( QCryptographicHash::Sha1 );
     hash.addData( body );
     QByteArray hashValue = hash.result();
+    int emlBodyId;
 
-    _queryValidateMail.bindValue( ":eml_hash", hashValue );
-    if ( ! _queryValidateMail.exec() ) {
-        _fail( "Query _queryValidateMail failed", _queryValidateMail );
+    _queryFindMailBody.bindValue( ":emlbody_hash", hashValue );
+    if ( ! _queryFindMailBody.exec() ) {
+        _fail( "Query _queryFindMailBody failed", _queryFindMailBody );
         return RESULT_ERROR;
-    } else if ( _queryValidateMail.first() ) {
-        return RESULT_DUPLICATE;
+    } else if ( _queryFindMailBody.first() ) {
+        emlBodyId = _queryFindMailBody.value( 0 ).toULongLong();
+    } else {
+        _queryInsertMailBody.bindValue( ":eml_hash", hashValue );
+        _queryInsertMailBody.bindValue( ":eml_body", readableText );
+        _queryInsertMailBody.bindValue( ":eml_msg", headers + body);
+
+        if ( ! _queryInsertMailBody.exec() ) {
+            _fail( "Query _queryInsertMailBody failed", _queryInsertMailBody );
+            return RESULT_ERROR;
+        } else if ( _queryInsertMailBody.first() ) {
+            emlBodyId = _queryInsertMailBody.value( 0 ).toULongLong();
+        }
     }
 
-    _queryInsertMail.bindValue( ":eml_hash", hashValue );
     _queryInsertMail.bindValue( ":eml_date", dateTime );
     _queryInsertMail.bindValue( ":eml_subj", subject );
-    _queryInsertMail.bindValue( ":eml_body", readableText );
-    _queryInsertMail.bindValue( ":eml_msg", headers + body);
+    _queryInsertMail.bindValue( ":eml_emlbody_id", emlBodyId );
 
     if ( ! _queryInsertMail.exec() ) {
         _fail( "Query _queryInsertMail failed", _queryInsertMail );

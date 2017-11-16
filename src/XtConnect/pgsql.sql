@@ -1,12 +1,27 @@
 CREATE SCHEMA xtbatch;
 
+CREATE TABLE xtbatch.emlbody (
+  emlbody_id serial primary key,
+  emlbody_hash bytea not null UNIQUE,
+  emlbody_body text not null,
+  emlbody_msg bytea not null
+);
+
+GRANT ALL ON TABLE xtbatch.emlbody TO xtrole;
+GRANT ALL ON SEQUENCE xtbatch.emlbody_emlbody_id_seq TO xtrole;
+
+COMMENT ON TABLE xtbatch.emlbody IS 'E-mail bodies';
+COMMENT ON COLUMN xtbatch.emlbody.emlbody_id IS 'E-mail body primary key';
+COMMENT ON COLUMN xtbatch.emlbody.emlbody_hash IS 'Email md5 hash of message to check for uniqueness';
+COMMENT ON COLUMN xtbatch.emlbody.emlbody_body IS 'E-mail body text';
+COMMENT ON COLUMN xtbatch.emlbody.emlbody_msg IS 'Complete e-mail message content';
+
+
 CREATE TABLE xtbatch.eml (
   eml_id serial primary key,
-  eml_hash bytea not null UNIQUE,
   eml_date date not null,
   eml_subj text not null,
-  eml_body text not null,
-  eml_msg bytea not null,
+  eml_emlbody_id integer not null REFERENCES xtbatch.emlbody (emlbody_id) ON DELETE CASCADE,
   eml_status char(1) not null CHECK (eml_status IN ('I','O','C'))
 );
  
@@ -15,10 +30,8 @@ GRANT ALL ON SEQUENCE xtbatch.eml_eml_id_seq TO xtrole;
  
 COMMENT ON TABLE xtbatch.eml IS 'E-mail Repository';
 COMMENT ON COLUMN xtbatch.eml.eml_id IS 'E-mail primary key';
-COMMENT ON COLUMN xtbatch.eml.eml_hash IS 'Email md5 hash of message to check for uniqueness';
 COMMENT ON COLUMN xtbatch.eml.eml_subj IS 'E-mail subject';
-COMMENT ON COLUMN xtbatch.eml.eml_body IS 'E-mail body text';
-COMMENT ON COLUMN xtbatch.eml.eml_msg IS 'Complete e-mail message content';
+COMMENT ON COLUMN xtbatch.eml.eml_emlbody_id IS 'Reference to E-mail body primary key';
 COMMENT ON COLUMN xtbatch.eml.eml_status IS 'Processing status I=In-process, O=open,C=complete';
 
 
