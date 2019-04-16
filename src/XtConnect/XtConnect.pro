@@ -29,3 +29,4 @@ trojita_libs = Imap MSA Streams Common
 
 myprefix = ../
 include(../linking.pri)
+macx:CONFIG += c++11
