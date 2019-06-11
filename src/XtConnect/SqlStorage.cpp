@@ -34,6 +34,8 @@
 #include <QTimer>
 #include <QVariant>
 
+#define DEBUG false
+
 namespace XtConnect {
 
 SqlStorage::SqlStorage(QObject *parent, const QString &host, const int port, const QString &dbname, const QString &username, const QString &password ) :
@@ -107,11 +109,10 @@ void SqlStorage::_prepareStatements()
 
 SqlStorage::ResultType SqlStorage::insertMail( const QDateTime &dateTime, const QString &subject, const QString &readableText, const QByteArray &headers, const QByteArray &body, quint64 &emlId )
 {
-    QCryptographicHash hash( QCryptographicHash::Sha1 );
-    hash.addData( body );
-    QByteArray hashValue = hash.result();
+    QByteArray hashValue = QCryptographicHash::hash( body, QCryptographicHash::Sha1 );
     int emlBodyId;
 
+    if (DEBUG) qDebug() << "insertMail" << hashValue;
     _queryFindMailBody.bindValue( ":emlbody_hash", hashValue );
     if ( ! _queryFindMailBody.exec() ) {
         _fail( "Query _queryFindMailBody failed", _queryFindMailBody );
@@ -119,15 +120,22 @@ SqlStorage::ResultType SqlStorage::insertMail( const QDateTime &dateTime, const 
     } else if ( _queryFindMailBody.first() ) {
         emlBodyId = _queryFindMailBody.value( 0 ).toULongLong();
     } else {
-        _queryInsertMailBody.bindValue( ":eml_hash", hashValue );
-        _queryInsertMailBody.bindValue( ":eml_body", readableText );
-        _queryInsertMailBody.bindValue( ":eml_msg", headers + body);
+        if (DEBUG) qDebug() << "insertMail about to insert" << hashValue << readableText;
+        _queryInsertMailBody.bindValue( ":emlbody_hash", hashValue );
+        _queryInsertMailBody.bindValue( ":emlbody_body", readableText );
+        _queryInsertMailBody.bindValue( ":emlbody_msg", headers + body);
 
         if ( ! _queryInsertMailBody.exec() ) {
             _fail( "Query _queryInsertMailBody failed", _queryInsertMailBody );
             return RESULT_ERROR;
         } else if ( _queryInsertMailBody.first() ) {
             emlBodyId = _queryInsertMailBody.value( 0 ).toULongLong();
+        } else {
+            if ( _queryInsertMailBody.lastError().type() != QSqlError::NoError)
+              _fail( "Query _queryInsertMailBody failed", _queryInsertMailBody );
+            else
+              _fail( "Query _queryInsertMailBody returned no rows", _queryInsertMailBody );
+            return RESULT_ERROR;
         }
     }
 
@@ -207,9 +215,6 @@ void SqlStorage::slotReconnect()
     _queryInsertMail.clear();
     _queryMarkMailReady.clear();
     db.close();
-
-    // Unregister the DB
-    QSqlDatabase::removeDatabase( QLatin1String("xtconnect-sqlstorage") );
 
     open();
 }

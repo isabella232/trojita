@@ -16,3 +16,4 @@ HEADERS += \
 
 INCLUDEPATH += ../
 DEPENDPATH += ../
+macx:CONFIG += c++11
