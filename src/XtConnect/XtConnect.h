@@ -86,6 +86,7 @@ private:
     QMap<QString, QPointer<MailSynchronizer> > m_syncers;
     QTimer *m_rotateMailboxes;
     XtCache *m_cache;
+    QString  m_imapPassword;
 };
 
 }
