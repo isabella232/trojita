@@ -44,6 +44,8 @@
 #include "SqlStorage.h"
 #include "Streams/SocketFactory.h"
 
+#define DEBUG false
+
 Q_DECLARE_METATYPE(QList<QSslCertificate>)
 #if QT_VERSION < 0x050000
 Q_DECLARE_METATYPE(QList<QSslError>)
@@ -92,20 +94,31 @@ XtConnect::XtConnect(QObject *parent, QSettings *s) :
             password = args.at(++i);
         } else if (args.at(i) == "-W") {
             readstdin = true;
+        } else if (args.at(i) == "-i") {
+            if (args.length() <= i + 1) qFatal("The \"-i\" option requires a value.");
+            readstdin = false;
+            m_imapPassword = args.at(++i);
+        } else if (args.at(i) == "-I") {
+            readstdin = true;
         } else if (args.at(i) == "--debug") {
             logConsole = true;
         } else if (args.at(i) == "--log" && args.length() > i) {
             if (args.length() <= i + 1) qFatal("The \"--log\" option requires a value.");
             logFile = args.at(++i);
         } else {
-            QByteArray err = args.at(i).toLocal8Bit();
-            qFatal("Error: unrecognized command line option '%s'.", err.constData());
+            qFatal("Error: unrecognized command line option '%s'.\n"
+                   "Usage: %s [ -h dbhost ] [ -p dbport ] [ -d dbname ] [ -U dbuser ] [ -W | -w dbpassword ] [ -I | -i imappassword ] [ --debug ] [ --log ]",
+                   args.at(i).toLocal8Bit().constData(), args.at(0).toLocal8Bit().constData());
         }
     }
 
     for ( int i = 0; i < 3 && password.isEmpty() && readstdin; i++ ) {
         QTextStream(stdout) << tr("Database Password: ");
         password = QTextStream(stdin).readLine();
+    }
+    for ( int i = 0; i < 3 && m_imapPassword.isEmpty() && readstdin; i++ ) {
+        QTextStream(stdout) << tr("Email/IMAP Password: ");
+        m_imapPassword = QTextStream(stdin).readLine();
     }
 
     setupModels();
@@ -214,12 +227,12 @@ void XtConnect::alertReceived(const QString &alert)
 
 void XtConnect::authenticationRequested()
 {
-    if ( ! m_settings->contains(Common::SettingsNames::imapPassKey) ) {
-        qWarning() << "Warning: no IMAP password set in the configuration.";
-        qWarning() << "Please remember to configure the synchronization service in Trojita GUI's settings dialog.";
+    if (m_imapPassword.isEmpty() && m_settings->contains(Common::SettingsNames::imapPassKey) ) {
+        m_imapPassword = m_settings->value(Common::SettingsNames::imapPassKey).toString();
     }
+
     m_model->setImapUser(m_settings->value(Common::SettingsNames::imapUserKey).toString());
-    m_model->setImapPassword(m_settings->value(Common::SettingsNames::imapPassKey).toString());
+    m_model->setImapPassword(m_imapPassword);
 }
 
 void XtConnect::sslErrors(const QList<QSslCertificate> &certificateChain, const QList<QSslError> &errors)
@@ -228,6 +241,8 @@ void XtConnect::sslErrors(const QList<QSslCertificate> &certificateChain, const 
     QList<QSslCertificate> lastKnownCerts = lastKnownCertPem.isEmpty() ?
                 QList<QSslCertificate>() :
                 QSslCertificate::fromData(lastKnownCertPem, QSsl::Pem);
+    if (DEBUG)
+      qDebug() << "XtConnect::sslErrors" << certificateChain.isEmpty() << lastKnownCerts.isEmpty() << (certificateChain == lastKnownCerts);
     if (!certificateChain.isEmpty() && !lastKnownCerts.isEmpty() && certificateChain == lastKnownCerts) {
         // It's the same certificate as the last time; we should accept that
         m_model->setSslPolicy(certificateChain, errors, true);
